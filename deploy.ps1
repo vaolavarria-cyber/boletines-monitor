@@ -34,7 +34,8 @@ if (-not (Test-Path .git)) {
 }
 
 # Ensure .gitignore exists
-$gitignore = @"venv
+$gitignore = @"
+venv
 __pycache__
 *.pyc
 seen.json
@@ -43,6 +44,7 @@ new_items.json
 last_run.json
 server.log
 *.env
+.claude
 "@
 Set-Content -Path .gitignore -Value $gitignore -Encoding UTF8
 
@@ -64,5 +66,5 @@ try {
 }
 
 Write-Host "Listo. Repo publicado en GitHub."
-Write-Host "Siguiente paso: desde Render (https://render.com) crea un nuevo Web Service y conecta este repo. Usa Start Command: 'gunicorn app:app --bind 0.0.0.0:$PORT'"
+Write-Host 'Siguiente paso: desde Render (https://render.com) crea un nuevo Web Service y conecta este repo. Usa Start Command: gunicorn app:app --bind 0.0.0.0:$PORT'
 Write-Host "Si querés, pega aquí la URL del repo y te doy los pasos exactos para conectar y configurar variables (todo lo que yo pueda hacer sin credenciales)."
