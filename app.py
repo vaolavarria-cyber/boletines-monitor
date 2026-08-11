@@ -324,11 +324,13 @@ Para cada ítem devolvé type (categoría corta: "Designación", "Acción AABE" 
 
 Si algún dato (nombre, monto, objetivo) no aparece explícitamente en el texto, no lo inventes: decí que no se especifica en vez de inventarlo. Si no hay nada relevante, devolvé una lista vacía."""
 
-SUMMARY_SYSTEM_PROMPT = """Sos un analista que lee la Primera Sección del Boletín Oficial de la Nación Argentina. Armá un resumen breve de lo más relevante del día para alguien que no tiene tiempo de leer todo el boletín: designaciones importantes, programas nuevos, acciones sobre bienes del Estado (AABE) y decisiones de gobierno con impacto real, siendo específico (nombres, organismos, objetivos concretos).
+SUMMARY_SYSTEM_PROMPT = """Sos un periodista que le cuenta a un vecino, en criollo y sin vueltas, qué salió hoy en la Primera Sección del Boletín Oficial de la Nación Argentina. La persona no sabe nada de derecho ni de jerga administrativa, así que tu trabajo es TRADUCIR lo importante, no citar ni resumir el texto legal tal cual está escrito.
 
-Formato de la respuesta: una lista de viñetas en español, cada línea empezando con "- " (guion y espacio), entre 3 y 6 viñetas, una idea concreta por viñeta. No agregues título, introducción ni texto corrido antes o después de la lista.
+Contá lo más relevante del día: designaciones importantes, programas nuevos, acciones sobre bienes del Estado (AABE) y decisiones de gobierno con impacto real. Sé específico (nombres, organismos, objetivos concretos) pero explicá cada cosa como si se la contaras hablando: qué pasó, quién lo hizo, y por qué le importaría a alguien que no lee el boletín todos los días. Nunca copies ni parafrasees literalmente frases del texto legal (números de artículo, "SIGEA", "resolución N°...", tablas, jerga como "desígnase" o "cúmplase"): reescribilo en español simple.
 
-Ignorá por completo tablas de multas/sanciones, aranceles, tasas de interés, avisos de licitaciones menores y trámites administrativos rutinarios: no los menciones ni los cuentes como parte del resumen.
+Formato de la respuesta: una lista de viñetas en español, cada línea empezando con "- " (guion y espacio), entre 3 y 6 viñetas, una idea concreta y corta por viñeta (máximo 2 oraciones). No agregues título, introducción ni texto corrido antes o después de la lista.
+
+Ignorá por completo tablas de multas/sanciones, listados de DNI/CUIT, aranceles, tasas de interés, avisos de licitaciones menores y trámites administrativos rutinarios: no los menciones ni los cuentes como parte del resumen.
 
 Si después de ignorar eso no queda nada relevante, respondé solo con una viñeta: "- No hay novedades relevantes en la edición de hoy." No agregues nada más, ni te disculpes, ni expliques tu proceso."""
 
@@ -342,6 +344,22 @@ def get_gemini_client():
     return GEMINI_CLIENT
 
 
+def _call_gemini_with_retry(fn, retries=4, base_delay=5):
+    """Reintenta una llamada a Gemini con backoff exponencial cuando falla por
+    rate-limit (429 / RESOURCE_EXHAUSTED), que es el caso más común y transitorio.
+    Otros errores no se reintentan (no tiene sentido reintentar un prompt inválido)."""
+    for attempt in range(retries):
+        try:
+            return fn()
+        except Exception as e:
+            is_rate_limit = '429' in str(e) or 'RESOURCE_EXHAUSTED' in str(e) or 'rate limit' in str(e).lower()
+            if not is_rate_limit or attempt == retries - 1:
+                raise
+            delay = base_delay * (2 ** attempt)
+            print(f'Gemini rate-limited (intento {attempt + 1}/{retries}), reintentando en {delay}s...')
+            time.sleep(delay)
+
+
 def ai_extract(text, system_prompt):
     """Devuelve una lista de matches juzgados relevantes por IA, o None si
     no hay API key configurada o falló la llamada (para usar el respaldo)."""
@@ -349,7 +367,7 @@ def ai_extract(text, system_prompt):
     if not client:
         return None
     try:
-        interaction = client.interactions.create(
+        interaction = _call_gemini_with_retry(lambda: client.interactions.create(
             model=AI_MODEL,
             system_instruction=system_prompt,
             input=text[:AI_MAX_TEXT_CHARS],
@@ -358,7 +376,7 @@ def ai_extract(text, system_prompt):
                 'mime_type': 'application/json',
                 'schema': RelevanceResult.model_json_schema(),
             },
-        )
+        ))
         result = RelevanceResult.model_validate_json(interaction.output_text)
         return [
             {'type': it.type, 'snippet': it.snippet[:400], 'why': it.why}
@@ -376,21 +394,36 @@ def ai_summarize(text, system_prompt):
     if not client:
         return None
     try:
-        interaction = client.interactions.create(
+        interaction = _call_gemini_with_retry(lambda: client.interactions.create(
             model=AI_MODEL,
             system_instruction=system_prompt,
             input=text[:AI_MAX_TEXT_CHARS],
-        )
+        ))
         return (interaction.output_text or '').strip() or None
     except Exception as e:
         print('Error generando resumen con IA (Gemini):', e)
         return None
 
 
+def _looks_like_table_or_boilerplate(sentence):
+    """El respaldo por palabras clave (sin IA) opera sobre texto plano extraído
+    del PDF, que mezcla prosa real con tablas (multas, DNI, tasas). Esas tablas
+    quedan como "oraciones" larguísimas y sin sentido cuando se citan tal cual,
+    así que las descartamos antes de puntuarlas."""
+    digits = sum(c.isdigit() for c in sentence)
+    if len(sentence) > 20 and digits / len(sentence) > 0.18:
+        return True
+    if len(sentence) > 600:
+        return True
+    if re.search(r'\bSIGEA\b|\bDNI\b|\bCUIT\b|\bC[UI]IT/\s*CI\b', sentence, re.IGNORECASE):
+        return True
+    return False
+
+
 def summarize_text(text, max_sentences=6):
-    sentences = split_sentences(text)
+    sentences = [s for s in split_sentences(text) if not _looks_like_table_or_boilerplate(s)]
     if not sentences:
-        return ''
+        return '- No hay novedades relevantes en la edición de hoy.'
     freq = {}
     for s in sentences:
         for w in re.findall(r"\w+", s.lower()):
@@ -398,7 +431,7 @@ def summarize_text(text, max_sentences=6):
                 continue
             freq[w] = freq.get(w, 0) + 1
     if not freq:
-        return ' '.join(sentences[:max_sentences])
+        return '\n'.join(f'- {s}' for s in sentences[:max_sentences])
     scores = []
     for s in sentences:
         score = 0
