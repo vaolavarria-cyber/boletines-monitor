@@ -54,6 +54,27 @@ a { color: inherit; }
   font-weight: 800;
   letter-spacing: -0.01em;
 }
+.brand-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.brand-tags {
+  display: flex;
+  gap: 6px;
+}
+.brand-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.tag-nacion { background: var(--accent-soft); color: var(--accent); }
+.tag-pba { background: #ffedd8; color: #c2410c; }
 .topbar .subtitle {
   margin: 1px 0 0;
   font-size: 0.8rem;
@@ -110,6 +131,83 @@ a { color: inherit; }
   transition: background 0.15s ease;
 }
 #refreshBtn:hover { background: var(--accent-hover); }
+
+/* --- Panel "qué vigila este monitor" --- */
+.watch-panel {
+  max-width: 1200px;
+  margin: 24px auto 0;
+  padding: 0 32px;
+}
+.watch-panel-inner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 22px;
+  box-shadow: var(--shadow-sm);
+}
+.watch-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.watch-panel-head h3 {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.watch-clear {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.watch-clear:hover { text-decoration: underline; }
+.watch-groups {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+@media (max-width: 860px) {
+  .watch-panel { padding: 0 18px; }
+  .watch-groups { grid-template-columns: 1fr; }
+}
+.watch-group-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+}
+.watch-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.watch-chip {
+  font-size: 0.71rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.1s ease;
+}
+.watch-chip:hover { transform: translateY(-1px); }
+.watch-chip.is-active {
+  border-color: currentColor;
+  box-shadow: var(--shadow-sm);
+}
 
 /* --- Layout general --- */
 main {

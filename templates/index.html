@@ -3,15 +3,21 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Monitor de Boletines</title>
+    <title>Monitor de Boletines · Nación y Provincia de Buenos Aires</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   </head>
   <body>
     <div class="topbar">
       <div class="brand">
         <div>
-          <h1>Monitor de Boletines</h1>
-          <p class="subtitle">Nacional y Provincia de Buenos Aires · relevancia evaluada con IA</p>
+          <div class="brand-title">
+            <h1>Monitor de Boletines</h1>
+            <div class="brand-tags">
+              <span class="brand-tag tag-nacion">Nación</span>
+              <span class="brand-tag tag-pba">Provincia de Buenos Aires</span>
+            </div>
+          </div>
+          <p class="subtitle">Relevancia evaluada con IA · se actualiza solo</p>
         </div>
         <nav>
           <a href="/" class="active">Inicio</a>
@@ -24,6 +30,33 @@
         <button id="refreshBtn">Actualizar ahora</button>
       </div>
     </div>
+
+    <section class="watch-panel">
+      <div class="watch-panel-inner">
+        <div class="watch-panel-head">
+          <h3>Qué vigila este monitor</h3>
+          <button type="button" id="clearFilter" class="watch-clear" hidden>Mostrar todo ✕</button>
+        </div>
+        <div class="watch-groups">
+          <div class="watch-group">
+            <span class="watch-group-label">Provincia de Buenos Aires</span>
+            <div class="watch-chips">
+              {% for c in watch_categories.provincial %}
+                <button type="button" class="watch-chip {{ c.type|badge_class }}" data-filter-type="{{ c.type }}" title="{{ c.desc }}">{{ c.type }}</button>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="watch-group">
+            <span class="watch-group-label">Nación</span>
+            <div class="watch-chips">
+              {% for c in watch_categories.nacional %}
+                <button type="button" class="watch-chip {{ c.type|badge_class }}" data-filter-type="{{ c.type }}" title="{{ c.desc }}">{{ c.type }}</button>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <main>
       <section class="bulletin-card">
@@ -40,7 +73,7 @@
         </div>
         <div class="match-list" id="prov-list">
           {% for m in data.provincial.matches %}
-            <article class="match-card">
+            <article class="match-card" data-type="{{ m.type }}">
               <div class="match-top">
                 <div class="match-top-left">
                   <span class="badge {{ m.type|badge_class }}">{{ m.type }}</span>
@@ -73,7 +106,7 @@
         </div>
         <div class="match-list" id="nac-list">
           {% for m in data.national.matches %}
-            <article class="match-card">
+            <article class="match-card" data-type="{{ m.type }}">
               <div class="match-top">
                 <div class="match-top-left">
                   <span class="badge {{ m.type|badge_class }}">{{ m.type }}</span>
@@ -126,6 +159,7 @@
         for (const m of matches) {
           const article = document.createElement('article');
           article.className = 'match-card';
+          article.dataset.type = m.type || '';
 
           const top = document.createElement('div');
           top.className = 'match-top';
@@ -218,7 +252,30 @@
         renderMatches(document.getElementById('prov-list'), j.provincial.matches);
         renderMatches(document.getElementById('nac-list'), j.national.matches);
         renderSummary(document.getElementById('summary'), j.national.summary);
+        applyFilter();
       }
+
+      const activeFilters = new Set();
+      const clearFilterBtn = document.getElementById('clearFilter');
+
+      function applyFilter() {
+        document.querySelectorAll('.match-card[data-type]').forEach(card => {
+          card.style.display = (activeFilters.size === 0 || activeFilters.has(card.dataset.type)) ? '' : 'none';
+        });
+        document.querySelectorAll('.watch-chip').forEach(chip => {
+          chip.classList.toggle('is-active', activeFilters.has(chip.dataset.filterType));
+        });
+        clearFilterBtn.hidden = activeFilters.size === 0;
+      }
+
+      document.querySelectorAll('.watch-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          const t = chip.dataset.filterType;
+          if (activeFilters.has(t)) activeFilters.delete(t); else activeFilters.add(t);
+          applyFilter();
+        });
+      });
+      clearFilterBtn.addEventListener('click', () => { activeFilters.clear(); applyFilter(); });
 
       document.getElementById('refreshBtn').addEventListener('click', fetchData);
       fetchData();

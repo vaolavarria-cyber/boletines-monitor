@@ -324,6 +324,40 @@ Para cada ítem devolvé type (categoría corta: "Designación", "Acción AABE" 
 
 Si algún dato (nombre, monto, objetivo) no aparece explícitamente en el texto, no lo inventes: decí que no se especifica en vez de inventarlo. Si no hay nada relevante, devolvé una lista vacía."""
 
+# Categorías que la IA puede asignar a cada coincidencia (ver prompts arriba).
+# Se muestran en la página principal para que quede claro qué vigila el monitor,
+# y sirven también como filtro visual sobre los resultados.
+WATCH_CATEGORIES = {
+    'provincial': [
+        {
+            'type': 'Tres de Febrero',
+            'desc': 'Decretos, resoluciones, convenios, designaciones u obras que mencionan directamente al Municipio de Tres de Febrero o sus localidades.',
+        },
+        {
+            'type': 'Gastos exorbitantes',
+            'desc': 'Gastos públicos llamativos por su magnitud o alguna irregularidad, no montos de rutina.',
+        },
+        {
+            'type': 'Acción de gobierno relevante',
+            'desc': 'Acciones de gobierno provincial que involucran directamente al Municipio de Tres de Febrero.',
+        },
+    ],
+    'nacional': [
+        {
+            'type': 'Designación',
+            'desc': 'Designaciones de funcionarios con algún nivel de relevancia (no ascensos administrativos de rutina).',
+        },
+        {
+            'type': 'Acción AABE',
+            'desc': 'Venta, cesión o gestión de bienes del Estado por la Agencia de Administración de Bienes del Estado.',
+        },
+        {
+            'type': 'Nuevo programa',
+            'desc': 'Lanzamiento de programas nacionales nuevos con impacto real.',
+        },
+    ],
+}
+
 SUMMARY_SYSTEM_PROMPT = """Sos un periodista que le cuenta a un vecino, en criollo y sin vueltas, qué salió hoy en la Primera Sección del Boletín Oficial de la Nación Argentina. La persona no sabe nada de derecho ni de jerga administrativa, así que tu trabajo es TRADUCIR lo importante, no citar ni resumir el texto legal tal cual está escrito.
 
 Contá lo más relevante del día: designaciones importantes, programas nuevos, acciones sobre bienes del Estado (AABE) y decisiones de gobierno con impacto real. Sé específico (nombres, organismos, objetivos concretos) pero explicá cada cosa como si se la contaras hablando: qué pasó, quién lo hizo, y por qué le importaría a alguien que no lee el boletín todos los días. Nunca copies ni parafrasees literalmente frases del texto legal (números de artículo, "SIGEA", "resolución N°...", tablas, jerga como "desígnase" o "cúmplase"): reescribilo en español simple.
@@ -623,7 +657,7 @@ def poller_loop():
 
 @app.route('/')
 def index():
-    return render_template('index.html', data=data_store)
+    return render_template('index.html', data=data_store, watch_categories=WATCH_CATEGORIES)
 
 
 @app.route('/api/data')

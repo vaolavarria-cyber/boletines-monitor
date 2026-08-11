@@ -3,14 +3,20 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Histórico · Monitor de Boletines</title>
+    <title>Histórico · Monitor de Boletines Nación y PBA</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   </head>
   <body>
     <div class="topbar">
       <div class="brand">
         <div>
-          <h1>Monitor de Boletines</h1>
+          <div class="brand-title">
+            <h1>Monitor de Boletines</h1>
+            <div class="brand-tags">
+              <span class="brand-tag tag-nacion">Nación</span>
+              <span class="brand-tag tag-pba">Provincia de Buenos Aires</span>
+            </div>
+          </div>
           <p class="subtitle">Histórico de novedades detectadas</p>
         </div>
         <nav>
