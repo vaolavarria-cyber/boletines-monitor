@@ -1,0 +1,10 @@
+venv
+__pycache__
+*.pyc
+seen.json
+state.json
+new_items.json
+last_run.json
+server.log
+*.env
+.claude
