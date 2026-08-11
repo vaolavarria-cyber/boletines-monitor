@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Histórico · Monitor de Boletines</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="brand">
+        <div>
+          <h1>Monitor de Boletines</h1>
+          <p class="subtitle">Histórico de novedades detectadas</p>
+        </div>
+        <nav>
+          <a href="/">Inicio</a>
+          <a href="/historico" class="active">Histórico</a>
+        </nav>
+      </div>
+    </div>
+
+    <div class="page">
+      <div class="historico-toolbar">
+        <input type="text" id="searchBox" placeholder="Buscar por texto, tipo o fuente...">
+        <span class="historico-count" id="resultCount">{{ history|length }} novedades guardadas</span>
+      </div>
+
+      {% if history %}
+        {% for day, items in history_by_day %}
+          <div class="day-group" data-day-group>
+            <h3>{{ day }}</h3>
+            <div class="match-list">
+              {% for m in items %}
+                <article class="match-card" data-search="{{ (m.type ~ ' ' ~ m.fuente ~ ' ' ~ m.snippet ~ ' ' ~ (m.why or ''))|lower }}">
+                  <div class="match-top">
+                    <div class="match-top-left">
+                      <span class="edition-badge">{{ m.fuente }}</span>
+                      <span class="badge {{ m.type|badge_class }}">{{ m.type }}</span>
+                    </div>
+                    {% if m.link %}
+                      <a class="detail-link" href="{{ m.link }}" target="_blank" rel="noopener">Ver en el PDF ↗</a>
+                    {% endif %}
+                  </div>
+                  <p class="snippet">{{ m.snippet }}</p>
+                  {% if m.why %}<p class="why">{{ m.why }}</p>{% endif %}
+                </article>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="empty-state">Todavía no hay novedades guardadas en el histórico. Van a ir apareciendo acá a medida que se detecten.</p>
+      {% endif %}
+    </div>
+
+    <script>
+      const searchBox = document.getElementById('searchBox');
+      const resultCount = document.getElementById('resultCount');
+      const totalItems = document.querySelectorAll('[data-search]').length;
+
+      searchBox.addEventListener('input', () => {
+        const q = searchBox.value.trim().toLowerCase();
+        let visible = 0;
+        document.querySelectorAll('[data-day-group]').forEach(group => {
+          let groupVisible = 0;
+          group.querySelectorAll('[data-search]').forEach(card => {
+            const match = !q || card.getAttribute('data-search').includes(q);
+            card.style.display = match ? '' : 'none';
+            if (match) { groupVisible++; visible++; }
+          });
+          group.style.display = groupVisible > 0 ? '' : 'none';
+        });
+        resultCount.textContent = q ? (visible + ' de ' + totalItems + ' novedades') : (totalItems + ' novedades guardadas');
+      });
+    </script>
+  </body>
+</html>

@@ -4,219 +4,23 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Monitor de Boletines</title>
-    <style>
-      :root {
-        --bg: #f4f5f7;
-        --surface: #ffffff;
-        --border: #e3e5ea;
-        --text: #1c1f26;
-        --text-muted: #6b7280;
-        --accent: #4f46e5;
-        --accent-soft: #eef0fe;
-        --ok: #16a34a;
-      }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        padding: 0 0 48px;
-        background: var(--bg);
-        color: var(--text);
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      }
-      .topbar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 22px 32px;
-        background: var(--surface);
-        border-bottom: 1px solid var(--border);
-        position: sticky;
-        top: 0;
-        z-index: 10;
-      }
-      .topbar h1 {
-        margin: 0;
-        font-size: 1.35rem;
-        font-weight: 700;
-      }
-      .topbar .subtitle {
-        margin: 2px 0 0;
-        font-size: 0.85rem;
-        color: var(--text-muted);
-      }
-      .status {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        font-size: 0.85rem;
-        color: var(--text-muted);
-      }
-      .status .dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: var(--ok);
-        display: inline-block;
-        box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
-      }
-      #refreshBtn {
-        background: var(--accent);
-        color: #fff;
-        border: none;
-        border-radius: 8px;
-        padding: 8px 16px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        cursor: pointer;
-      }
-      #refreshBtn:hover { background: #4338ca; }
-
-      main {
-        max-width: 1200px;
-        margin: 28px auto 0;
-        padding: 0 32px;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 24px;
-      }
-      @media (max-width: 860px) {
-        main { grid-template-columns: 1fr; }
-        .topbar { padding: 16px 20px; }
-      }
-
-      .bulletin-card {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        padding: 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-      }
-      .bulletin-header {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        border-bottom: 1px solid var(--border);
-        padding-bottom: 12px;
-      }
-      .bulletin-header h2 {
-        margin: 0;
-        font-size: 1.05rem;
-        font-weight: 700;
-      }
-      .edition-badge {
-        font-size: 0.78rem;
-        color: var(--text-muted);
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: 999px;
-        padding: 3px 10px;
-      }
-      .pdf-full-link {
-        font-size: 0.8rem;
-        font-weight: 600;
-        color: var(--accent);
-        text-decoration: none;
-      }
-      .pdf-full-link:hover { text-decoration: underline; }
-
-      .match-list {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-      .match-card {
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 14px;
-        background: var(--bg);
-      }
-      .match-top {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 8px;
-      }
-      .badge {
-        font-size: 0.72rem;
-        font-weight: 700;
-        letter-spacing: 0.02em;
-        padding: 3px 9px;
-        border-radius: 999px;
-        text-transform: uppercase;
-      }
-      .badge-blue   { background: #e0edff; color: #1d4ed8; }
-      .badge-green  { background: #e2f7e9; color: #15803d; }
-      .badge-purple { background: #f1e6fc; color: #7e22ce; }
-      .badge-orange { background: #ffedd8; color: #c2410c; }
-      .badge-teal   { background: #d9f5f0; color: #0f766e; }
-
-      .detail-link {
-        font-size: 0.78rem;
-        font-weight: 600;
-        color: var(--accent);
-        text-decoration: none;
-        white-space: nowrap;
-      }
-      .detail-link:hover { text-decoration: underline; }
-
-      .snippet {
-        margin: 0 0 6px;
-        font-size: 0.92rem;
-        line-height: 1.45;
-      }
-      .snippet::before, .snippet::after { content: '"'; color: var(--text-muted); }
-      .why {
-        margin: 0;
-        font-size: 0.82rem;
-        color: var(--text-muted);
-        font-style: italic;
-      }
-      .empty-state {
-        font-size: 0.88rem;
-        color: var(--text-muted);
-        padding: 10px 0;
-      }
-
-      .summary-card {
-        max-width: 1200px;
-        margin: 24px auto 0;
-        padding: 0 32px;
-      }
-      .summary-card .inner {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        padding: 20px;
-      }
-      .summary-card h4 {
-        margin: 0 0 8px;
-        font-size: 0.95rem;
-        font-weight: 700;
-      }
-      .summary-card p {
-        margin: 0;
-        font-size: 0.88rem;
-        line-height: 1.5;
-        color: var(--text-muted);
-      }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   </head>
   <body>
     <div class="topbar">
-      <div>
-        <h1>Monitor de Boletines</h1>
-        <p class="subtitle">Nacional y Provincia de Buenos Aires · relevancia evaluada con IA</p>
+      <div class="brand">
+        <div>
+          <h1>Monitor de Boletines</h1>
+          <p class="subtitle">Nacional y Provincia de Buenos Aires · relevancia evaluada con IA</p>
+        </div>
+        <nav>
+          <a href="/" class="active">Inicio</a>
+          <a href="/historico">Histórico</a>
+        </nav>
       </div>
       <div class="status">
         <span class="dot"></span>
-        <span id="last-checked">Última verificación: {{ data.last_checked or '—' }}</span>
+        <span id="last-checked">Última verificación: {{ data.last_checked|format_checked_at or '—' }}</span>
         <button id="refreshBtn">Actualizar ahora</button>
       </div>
     </div>
@@ -225,18 +29,23 @@
       <section class="bulletin-card">
         <div class="bulletin-header">
           <h2>Provincia (Sección OFICIAL)</h2>
-          <span class="edition-badge" id="prov-edition">{{ data.provincial.edition or '—' }}</span>
-          {% if data.provincial.pdf_url %}
-            <a class="pdf-full-link" id="prov-pdf-link" href="{{ data.provincial.pdf_url }}" target="_blank" rel="noopener">Ver boletín completo ↗</a>
-          {% else %}
-            <span class="pdf-full-link" id="prov-pdf-link" style="display:none"></span>
-          {% endif %}
+          <div class="bulletin-header-right">
+            <span class="edition-badge" id="prov-edition">{{ data.provincial.edition or '—' }}</span>
+            {% if data.provincial.pdf_url %}
+              <a class="pdf-full-link" id="prov-pdf-link" href="{{ data.provincial.pdf_url }}" target="_blank" rel="noopener">Ver boletín completo ↗</a>
+            {% else %}
+              <span class="pdf-full-link" id="prov-pdf-link" style="display:none"></span>
+            {% endif %}
+          </div>
         </div>
         <div class="match-list" id="prov-list">
           {% for m in data.provincial.matches %}
             <article class="match-card">
               <div class="match-top">
-                <span class="badge {{ m.type|badge_class }}">{{ m.type }}</span>
+                <div class="match-top-left">
+                  <span class="badge {{ m.type|badge_class }}">{{ m.type }}</span>
+                  {% if m.date %}<span class="date-pill">{{ m.date }}</span>{% endif %}
+                </div>
                 {% if m.link %}
                   <a class="detail-link" href="{{ m.link }}" target="_blank" rel="noopener">Ver en el PDF{% if m.page %} (pág. {{ m.page }}){% endif %} ↗</a>
                 {% endif %}
@@ -253,18 +62,23 @@
       <section class="bulletin-card">
         <div class="bulletin-header">
           <h2>Nacional (Primera Sección)</h2>
-          <span class="edition-badge" id="nac-edition">{{ data.national.edition or '—' }}</span>
-          {% if data.national.pdf_url %}
-            <a class="pdf-full-link" id="nac-pdf-link" href="{{ data.national.pdf_url }}" target="_blank" rel="noopener">Ver boletín completo ↗</a>
-          {% else %}
-            <span class="pdf-full-link" id="nac-pdf-link" style="display:none"></span>
-          {% endif %}
+          <div class="bulletin-header-right">
+            <span class="edition-badge" id="nac-edition">{{ data.national.edition or '—' }}</span>
+            {% if data.national.pdf_url %}
+              <a class="pdf-full-link" id="nac-pdf-link" href="{{ data.national.pdf_url }}" target="_blank" rel="noopener">Ver boletín completo ↗</a>
+            {% else %}
+              <span class="pdf-full-link" id="nac-pdf-link" style="display:none"></span>
+            {% endif %}
+          </div>
         </div>
         <div class="match-list" id="nac-list">
           {% for m in data.national.matches %}
             <article class="match-card">
               <div class="match-top">
-                <span class="badge {{ m.type|badge_class }}">{{ m.type }}</span>
+                <div class="match-top-left">
+                  <span class="badge {{ m.type|badge_class }}">{{ m.type }}</span>
+                  {% if m.date %}<span class="date-pill">{{ m.date }}</span>{% endif %}
+                </div>
                 {% if m.link %}
                   <a class="detail-link" href="{{ m.link }}" target="_blank" rel="noopener">Ver en el PDF{% if m.page %} (pág. {{ m.page }}){% endif %} ↗</a>
                 {% endif %}
@@ -282,7 +96,13 @@
     <div class="summary-card">
       <div class="inner">
         <h4>Resumen general (Nacional)</h4>
-        <p id="summary">{{ data.national.summary or '—' }}</p>
+        <ul class="summary-list" id="summary">
+          {% for line in data.national.summary|bullet_lines %}
+            <li>{{ line }}</li>
+          {% else %}
+            <li>—</li>
+          {% endfor %}
+        </ul>
       </div>
     </div>
 
@@ -310,10 +130,21 @@
           const top = document.createElement('div');
           top.className = 'match-top';
 
+          const topLeft = document.createElement('div');
+          topLeft.className = 'match-top-left';
+
           const badge = document.createElement('span');
           badge.className = 'badge ' + badgeClass(m.type);
           badge.textContent = m.type;
-          top.appendChild(badge);
+          topLeft.appendChild(badge);
+
+          if (m.date) {
+            const datePill = document.createElement('span');
+            datePill.className = 'date-pill';
+            datePill.textContent = m.date;
+            topLeft.appendChild(datePill);
+          }
+          top.appendChild(topLeft);
 
           if (m.link) {
             const a = document.createElement('a');
@@ -342,6 +173,31 @@
         }
       }
 
+      function renderSummary(listEl, summary) {
+        listEl.innerHTML = '';
+        const lines = (summary || '').split('\n').map(l => l.replace(/^-\s*/, '').trim()).filter(Boolean);
+        if (lines.length === 0) {
+          const li = document.createElement('li');
+          li.textContent = '—';
+          listEl.appendChild(li);
+          return;
+        }
+        for (const line of lines) {
+          const li = document.createElement('li');
+          li.textContent = line;
+          listEl.appendChild(li);
+        }
+      }
+
+      function formatCheckedAt(iso) {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        if (isNaN(d)) return iso;
+        const pad = n => String(n).padStart(2, '0');
+        return pad(d.getUTCDate()) + '/' + pad(d.getUTCMonth() + 1) + '/' + d.getUTCFullYear() +
+          ' ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ' UTC';
+      }
+
       function setPdfLink(linkEl, url) {
         if (url) {
           linkEl.href = url;
@@ -354,17 +210,18 @@
       async function fetchData() {
         const r = await fetch('/api/data');
         const j = await r.json();
-        document.getElementById('last-checked').textContent = 'Última verificación: ' + (j.last_checked || '—');
+        document.getElementById('last-checked').textContent = 'Última verificación: ' + formatCheckedAt(j.last_checked);
         document.getElementById('prov-edition').textContent = j.provincial.edition || '—';
         document.getElementById('nac-edition').textContent = j.national.edition || '—';
         setPdfLink(document.getElementById('prov-pdf-link'), j.provincial.pdf_url);
         setPdfLink(document.getElementById('nac-pdf-link'), j.national.pdf_url);
         renderMatches(document.getElementById('prov-list'), j.provincial.matches);
         renderMatches(document.getElementById('nac-list'), j.national.matches);
-        document.getElementById('summary').textContent = j.national.summary || '—';
+        renderSummary(document.getElementById('summary'), j.national.summary);
       }
 
       document.getElementById('refreshBtn').addEventListener('click', fetchData);
+      fetchData();
       setInterval(fetchData, 60000);
     </script>
   </body>

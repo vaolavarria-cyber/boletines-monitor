@@ -42,6 +42,7 @@ seen.json
 state.json
 new_items.json
 last_run.json
+history.json
 server.log
 *.env
 .claude

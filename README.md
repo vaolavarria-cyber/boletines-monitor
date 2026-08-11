@@ -44,6 +44,18 @@ Si la variable no está configurada (o falla la llamada a la IA), la app **cae a
 
 Los criterios de relevancia que usa la IA están en `PROVINCIAL_SYSTEM_PROMPT` y `NATIONAL_SYSTEM_PROMPT` en `app.py`, por si querés ajustarlos.
 
+### Histórico permanente (opcional, vía GitHub)
+
+Render (plan gratis) no tiene disco persistente: cada reinicio borra lo que se detectó hasta ese momento. Para que las novedades queden guardadas para siempre en la página `/historico`, la app las guarda como un commit en `history.json` dentro de este mismo repo, usando la API de GitHub.
+
+Para activarlo:
+
+1. Andá a GitHub → foto de perfil → **Settings** → **Developer settings** → **Personal access tokens** → **Tokens (classic)** → **Generate new token**.
+2. Dale permiso de **repo** (acceso de lectura/escritura a repositorios), generalo y copiá el token (empieza con `ghp_...`).
+3. Configuralo como variable de entorno `GITHUB_TOKEN` (en Render: Environment → Add Environment Variable).
+
+Si no se configura, la app sigue funcionando igual (matches y resumen del día), solo que el histórico no persiste entre reinicios.
+
 Notas:
 - Es una solución mínima y local para obtener coincidencias y un resumen simple.
 - Para producción se recomienda agregar manejo de errores, backoff, almacenamiento, y respetar políticas del sitio.

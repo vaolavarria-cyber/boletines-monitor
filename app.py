@@ -2,10 +2,12 @@ from flask import Flask, render_template, jsonify
 import threading
 import time
 import io
+import base64
 import requests
 from bs4 import BeautifulSoup
 from pypdf import PdfReader
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 import re
 import os
 import json
@@ -30,6 +32,32 @@ def badge_class(type_str):
 
 app.jinja_env.filters['badge_class'] = badge_class
 
+
+def bullet_lines(text):
+    """Divide un resumen en viñetas ("- línea") en una lista de líneas
+    limpias, para renderizarlas como <li> tanto en el server como en el JS."""
+    return [
+        (l[2:].strip() if l.strip().startswith('- ') else l.strip())
+        for l in (text or '').split('\n') if l.strip()
+    ]
+
+
+app.jinja_env.filters['bullet_lines'] = bullet_lines
+
+
+def format_checked_at(iso_str):
+    """Formatea el timestamp ISO de 'last_checked' como dd/mm/aaaa HH:MM."""
+    if not iso_str:
+        return None
+    try:
+        dt = datetime.fromisoformat(iso_str)
+        return dt.strftime('%d/%m/%Y %H:%M UTC')
+    except Exception:
+        return iso_str
+
+
+app.jinja_env.filters['format_checked_at'] = format_checked_at
+
 HEADERS = {'User-Agent': 'Mozilla/5.0 (compatible; BoletinesMonitor/1.0)'}
 
 # Provincia de Buenos Aires: se busca en el home el link a la sección OFICIAL del
@@ -50,6 +78,18 @@ MAX_MATCHES = 40
 BASE_DIR = os.path.dirname(__file__)
 SEEN_FILE = os.path.join(BASE_DIR, 'seen.json')
 STATE_FILE = os.path.join(BASE_DIR, 'state.json')
+HISTORY_FILE = os.path.join(BASE_DIR, 'history.json')
+
+# --- Histórico persistente (guardado como archivo versionado en GitHub) ---
+# Render no tiene disco persistente en el plan gratis: cada reinicio borra
+# state.json/seen.json. Para que el histórico sobreviva a los reinicios, se
+# guarda como un archivo en el propio repo de GitHub (un commit por tanda de
+# novedades, que en la práctica es como mucho un par de veces por día).
+GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
+GITHUB_REPO = os.environ.get('GITHUB_REPO', 'vaolavarria-cyber/boletines-monitor')
+GITHUB_BRANCH = os.environ.get('GITHUB_BRANCH', 'master')
+HISTORY_PATH_IN_REPO = 'history.json'
+MAX_HISTORY_ITEMS = 500
 
 data_store = {
     'provincial': {'matches': [], 'edition': None, 'pdf_url': None},
@@ -74,8 +114,67 @@ def save_json(path, obj):
         pass
 
 
+def github_api_url(path):
+    return f'https://api.github.com/repos/{GITHUB_REPO}/contents/{path}'
+
+
+def github_get_history():
+    """Trae el histórico guardado en GitHub. Es lectura pública (no necesita
+    token) porque el repo es público."""
+    try:
+        r = requests.get(
+            f'https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/{HISTORY_PATH_IN_REPO}',
+            timeout=REQUEST_TIMEOUT,
+        )
+        if r.status_code == 200 and r.text.strip():
+            return json.loads(r.text)
+    except Exception as e:
+        print('No se pudo leer el histórico desde GitHub:', e)
+    return None
+
+
+def github_save_history(history):
+    """Guarda el histórico como un commit en el repo de GitHub. Requiere
+    GITHUB_TOKEN (personal access token con permiso de escritura sobre el
+    repo). Si no está configurado, se avisa una sola vez y se sigue
+    funcionando sin histórico persistente."""
+    if not GITHUB_TOKEN:
+        return False
+    try:
+        headers = {
+            'Authorization': f'Bearer {GITHUB_TOKEN}',
+            'Accept': 'application/vnd.github+json',
+        }
+        sha = None
+        r = requests.get(github_api_url(HISTORY_PATH_IN_REPO), headers=headers, timeout=REQUEST_TIMEOUT)
+        if r.status_code == 200:
+            sha = r.json().get('sha')
+
+        content_b64 = base64.b64encode(
+            json.dumps(history, ensure_ascii=False, indent=2).encode('utf-8')
+        ).decode('ascii')
+        payload = {
+            'message': 'Actualiza histórico de boletines',
+            'content': content_b64,
+            'branch': GITHUB_BRANCH,
+        }
+        if sha:
+            payload['sha'] = sha
+        r = requests.put(github_api_url(HISTORY_PATH_IN_REPO), headers=headers, json=payload, timeout=REQUEST_TIMEOUT)
+        if r.status_code not in (200, 201):
+            print('Error guardando histórico en GitHub:', r.status_code, r.text[:300])
+            return False
+        return True
+    except Exception as e:
+        print('Error guardando histórico en GitHub:', e)
+        return False
+
+
 SEEN = set(load_json(SEEN_FILE, []))
 STATE = load_json(STATE_FILE, {})
+HISTORY = github_get_history()
+if HISTORY is None:
+    HISTORY = load_json(HISTORY_FILE, [])
 
 # Repoblar data_store con el último resultado conocido: si el servidor se
 # reinicia y la edición del día no cambió, no se vuelve a descargar/parsear
@@ -128,6 +227,25 @@ def locate_page(snippet, pages):
     for i, page_text in enumerate(pages, start=1):
         if needle in normalize_text(page_text).lower():
             return i
+    return None
+
+
+def format_display_date(source, edition):
+    """Devuelve una fecha legible dd/mm/aaaa a partir del campo 'edition' de
+    cada fuente (que tiene formatos distintos), para mostrar en cada
+    anuncio y en el histórico."""
+    if not edition:
+        return None
+    try:
+        if source == 'provincial':
+            m = re.search(r'(\d{2}/\d{2}/\d{4})', edition)
+            if m:
+                return m.group(1)
+        else:
+            dt = parsedate_to_datetime(edition)
+            return dt.strftime('%d/%m/%Y')
+    except Exception:
+        pass
     return None
 
 
@@ -206,11 +324,13 @@ Para cada ítem devolvé type (categoría corta: "Designación", "Acción AABE" 
 
 Si algún dato (nombre, monto, objetivo) no aparece explícitamente en el texto, no lo inventes: decí que no se especifica en vez de inventarlo. Si no hay nada relevante, devolvé una lista vacía."""
 
-SUMMARY_SYSTEM_PROMPT = """Sos un analista que lee la Primera Sección del Boletín Oficial de la Nación Argentina. Escribí un resumen breve (3 a 5 oraciones, texto corrido en español, sin viñetas ni listas) de lo más relevante del día para alguien que no tiene tiempo de leer todo el boletín: designaciones importantes, programas nuevos, acciones sobre bienes del Estado (AABE) y decisiones de gobierno con impacto real, siendo específico (nombres, organismos, objetivos concretos).
+SUMMARY_SYSTEM_PROMPT = """Sos un analista que lee la Primera Sección del Boletín Oficial de la Nación Argentina. Armá un resumen breve de lo más relevante del día para alguien que no tiene tiempo de leer todo el boletín: designaciones importantes, programas nuevos, acciones sobre bienes del Estado (AABE) y decisiones de gobierno con impacto real, siendo específico (nombres, organismos, objetivos concretos).
+
+Formato de la respuesta: una lista de viñetas en español, cada línea empezando con "- " (guion y espacio), entre 3 y 6 viñetas, una idea concreta por viñeta. No agregues título, introducción ni texto corrido antes o después de la lista.
 
 Ignorá por completo tablas de multas/sanciones, aranceles, tasas de interés, avisos de licitaciones menores y trámites administrativos rutinarios: no los menciones ni los cuentes como parte del resumen.
 
-Si después de ignorar eso no queda nada relevante, respondé solo: "No hay novedades relevantes en la edición de hoy." No agregues nada más, ni te disculpes, ni expliques tu proceso."""
+Si después de ignorar eso no queda nada relevante, respondé solo con una viñeta: "- No hay novedades relevantes en la edición de hoy." No agregues nada más, ni te disculpes, ni expliques tu proceso."""
 
 
 def get_gemini_client():
@@ -287,7 +407,7 @@ def summarize_text(text, max_sentences=6):
         scores.append((score, s))
     scores.sort(reverse=True)
     selected = [s for _, s in scores[:max_sentences]]
-    return ' '.join(selected)
+    return '\n'.join(f'- {s}' for s in selected)
 
 
 def get_gba_oficial_link():
@@ -375,6 +495,27 @@ def attach_links(matches, pages, pdf_url):
     return matches
 
 
+def append_to_history(new_items):
+    """Guarda cada novedad nueva en el histórico permanente (persistido en
+    GitHub) para poder consultarlo aunque Render se haya reiniciado."""
+    global HISTORY
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for fuente, m in new_items:
+        HISTORY.insert(0, {
+            'fuente': fuente,
+            'type': m.get('type'),
+            'date': m.get('date'),
+            'snippet': m.get('snippet'),
+            'why': m.get('why'),
+            'link': m.get('link'),
+            'added_at': now_iso,
+        })
+    HISTORY = HISTORY[:MAX_HISTORY_ITEMS]
+    save_json(HISTORY_FILE, HISTORY)
+    if not github_save_history(HISTORY):
+        print('Histórico no persistido en GitHub (falta GITHUB_TOKEN o falló el commit). Ver README.')
+
+
 def poll_once():
     new_items = []
 
@@ -386,6 +527,9 @@ def poll_once():
         if prov_matches is None:
             prov_matches = extract_provincial(prov_norm)
         prov_matches = attach_links(prov_matches, prov_pages, STATE.get('provincial_pdf_url'))
+        prov_date = format_display_date('provincial', prov_edition)
+        for m in prov_matches:
+            m['date'] = prov_date
         data_store['provincial']['matches'] = prov_matches
         STATE['provincial_matches'] = prov_matches
         save_json(STATE_FILE, STATE)
@@ -405,6 +549,9 @@ def poll_once():
         if nac_matches is None:
             nac_matches = extract_national(nac_norm)
         nac_matches = attach_links(nac_matches, nac_pages, BORA_PDF_URL)
+        nac_date = format_display_date('national', nac_edition)
+        for m in nac_matches:
+            m['date'] = nac_date
         nac_summary = ai_summarize(nac_norm, SUMMARY_SYSTEM_PROMPT)
         if not nac_summary:
             nac_summary = summarize_text(nac_norm, max_sentences=6)
@@ -429,6 +576,7 @@ def poll_once():
         save_json(SEEN_FILE, list(SEEN))
         data_store['last_new_items'] = new_items
         save_json(os.path.join(BASE_DIR, 'new_items.json'), new_items)
+        append_to_history(new_items)
 
 
 def poller_loop():
@@ -448,6 +596,46 @@ def index():
 @app.route('/api/data')
 def api_data():
     return jsonify(data_store)
+
+
+def group_history_by_day(history):
+    """Agrupa el histórico en (etiqueta_del_día, items), más reciente primero."""
+    def sort_key(item):
+        d = item.get('date')
+        if d:
+            try:
+                return datetime.strptime(d, '%d/%m/%Y')
+            except Exception:
+                pass
+        try:
+            return datetime.fromisoformat(item.get('added_at')).replace(tzinfo=None)
+        except Exception:
+            return datetime.min
+
+    def label(item):
+        if item.get('date'):
+            return item['date']
+        try:
+            return datetime.fromisoformat(item.get('added_at')).strftime('%d/%m/%Y')
+        except Exception:
+            return 'Sin fecha'
+
+    groups = []
+    current_label = None
+    current_list = None
+    for item in sorted(history, key=sort_key, reverse=True):
+        lbl = label(item)
+        if lbl != current_label:
+            current_label = lbl
+            current_list = []
+            groups.append((lbl, current_list))
+        current_list.append(item)
+    return groups
+
+
+@app.route('/historico')
+def historico():
+    return render_template('historico.html', history=HISTORY, history_by_day=group_history_by_day(HISTORY))
 
 
 def start_poller_once():
